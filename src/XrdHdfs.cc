@@ -55,6 +55,7 @@ namespace
 
    hdfsFS hadoop_connect(const char* instance, int port, const char* username)
    {
+      errno = 0;
 #ifdef REUSE_CONNECTION
       XrdSysMutexHelper fs_lock(g_fs_mutex);
       std::map<std::string, hdfsFS>::iterator iter = g_fs_map.find(username);
@@ -97,7 +98,6 @@ ExtractAuthName(const XrdOucEnv *client)
 hdfsFS hadoop_connect(const XrdOucEnv *client)
 {
     const char *username = ExtractAuthName(client);
-    errno = 0;
     return hadoop_connect("default", 0, username);
 }
 
@@ -497,8 +497,22 @@ int XrdHdfsFile::Open(const char               *path,      // In
        m_state = new ChecksumState(ChecksumManager::ALL);
    }
 
+   m_hdfs_username = ExtractAuthName(&client);
+
    return XrdOssOK;
 }
+
+/******************************************************************************/
+/*                                 F c h m o d                                */
+/******************************************************************************/
+int XrdHdfsFile::Fchmod(mode_t mode)
+{
+    if ((m_hdfs_username == "") || (!fname)) {
+        return -EBADF;
+    }
+    return dynamic_cast<XrdHdfsSys*>(g_hdfs_oss)->Chmod(fname, mode, m_hdfs_username);
+}
+
 
 /******************************************************************************/
 /*                                 C l o s e                                  */
@@ -972,6 +986,14 @@ cleanup:
 int
 XrdHdfsSys::Chmod(const char *req_fname, mode_t mode, XrdOucEnv *envp)
 {
+    std::string hdfs_username = ExtractAuthName(envp);
+    return Chmod(req_fname, mode, hdfs_username);
+}
+
+
+int
+XrdHdfsSys::Chmod(const char *req_fname, mode_t mode, const std::string &hdfs_username) 
+{
     static const char *epname = "chmod";
     int retc = XrdOssOK;
     hdfsFS fs = NULL;
@@ -982,7 +1004,7 @@ XrdHdfsSys::Chmod(const char *req_fname, mode_t mode, XrdOucEnv *envp)
         goto cleanup;
     }
 
-    fs = hadoop_connect(envp);
+    fs = hadoop_connect("default", 0, hdfs_username.c_str());
     if (fs == NULL) {
         retc = XrdHdfsSys::Emsg(epname, error, EIO, "chmod", fname);
         goto cleanup;

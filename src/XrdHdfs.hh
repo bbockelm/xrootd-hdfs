@@ -86,6 +86,8 @@ public:
 
         int            Close(long long *retsz=0);
 
+        int            Fchmod(mode_t mode);
+
         int            Fstat(struct stat *);
 
         int            Fsync() {return -ENOTSUP;}
@@ -125,6 +127,7 @@ private:
 hdfsFS   m_fs; // File system object.
 hdfsFile fh; // File Handle
 char *fname; // File Name
+std::string m_hdfs_username; // HDFS username
 ssize_t m_nextoff; // Next offset for writes.
 
 char *readbuf;        // Read buffer
@@ -169,6 +172,7 @@ public:
 // Other Functions
 //
         int            Chmod(const char*, mode_t, XrdOucEnv* envp=NULL);
+        int            Chmod(const char*, mode_t, const std::string &hdfs_username);
 
         int            Create(const char *, const char *, mode_t, XrdOucEnv &,
                               int opts=0);
